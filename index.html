@@ -205,5 +205,429 @@ $("#homeBtn").onclick=()=>{
 };
 renderGarden();renderThings();
 </script>
-<script>(function(){const e=document.getElementById('entrance'),s=document.getElementById('littleStore');document.body.classList.add('entering');function enter(){if(e.classList.contains('hidden'))return;s.classList.add('enter-fade');setTimeout(()=>{e.classList.add('hidden');e.style.opacity="";e.style.visibility="";e.style.pointerEvents="";s.classList.remove('enter-fade')},420);document.body.classList.remove('entering')}s.onclick=enter;s.onkeydown=x=>{if(x.key==='Enter'||x.key===' '){x.preventDefault();enter()}}})();</script></body>
+<script>(function(){const e=document.getElementById('entrance'),s=document.getElementById('littleStore');document.body.classList.add('entering');function enter(){if(e.classList.contains('hidden'))return;s.classList.add('enter-fade');setTimeout(()=>{e.classList.add('hidden');e.style.opacity="";e.style.visibility="";e.style.pointerEvents="";s.classList.remove('enter-fade')},420);document.body.classList.remove('entering')}s.onclick=enter;s.onkeydown=x=>{if(x.key==='Enter'||x.key===' '){x.preventDefault();enter()}}})();</script>
+<script>
+/* ===== THE LITTLE SHOP · REAL ACCOUNT SYSTEM ===== */
+
+(function () {
+  if (!window.supabase) return;
+
+  const client = window.supabase;
+
+  function makeAuthUI() {
+    if (document.getElementById("realAuthLayer")) return;
+
+    const style = document.createElement("style");
+    style.textContent = `
+      #realAuthLayer{
+        position:fixed;
+        inset:0;
+        z-index:99999;
+        display:none;
+        align-items:center;
+        justify-content:center;
+        background:rgba(70,48,36,.22);
+        backdrop-filter:blur(5px);
+        padding:20px;
+      }
+
+      #realAuthCard{
+        width:min(420px,92vw);
+        background:#fffaf0;
+        border:2px solid #8b654d;
+        border-radius:24px;
+        padding:28px;
+        box-shadow:0 18px 60px rgba(60,40,30,.2);
+        color:#6f4d3b;
+      }
+
+      #realAuthCard h2{
+        margin:0 0 6px;
+        font-size:28px;
+      }
+
+      #realAuthCard .auth-sub{
+        margin:0 0 20px;
+        opacity:.75;
+        line-height:1.5;
+      }
+
+      #realAuthCard label{
+        display:block;
+        margin:12px 0 6px;
+        font-size:14px;
+      }
+
+      #realAuthCard input{
+        width:100%;
+        box-sizing:border-box;
+        padding:12px 14px;
+        border:1.5px solid #b99b83;
+        border-radius:12px;
+        background:#fffdf8;
+        color:#5d4233;
+        outline:none;
+        font:inherit;
+      }
+
+      #realAuthCard input:focus{
+        border-color:#6e8ea3;
+      }
+
+      .real-auth-main{
+        width:100%;
+        margin-top:18px;
+        padding:12px;
+        border:0;
+        border-radius:14px;
+        background:#f1e4d2;
+        color:#654735;
+        font-weight:700;
+        cursor:pointer;
+      }
+
+      .real-auth-switch{
+        margin-top:14px;
+        text-align:center;
+        font-size:14px;
+      }
+
+      .real-auth-switch button,
+      #realAuthClose{
+        border:0;
+        background:none;
+        color:#6e8ea3;
+        cursor:pointer;
+        font:inherit;
+      }
+
+      #realAuthClose{
+        position:absolute;
+        right:18px;
+        top:14px;
+        font-size:24px;
+      }
+
+      #realAuthMessage{
+        min-height:22px;
+        margin-top:12px;
+        font-size:14px;
+        line-height:1.4;
+      }
+
+      #shopAccountButton{
+        position:fixed;
+        right:20px;
+        bottom:20px;
+        z-index:5000;
+        border:1.5px solid #8b654d;
+        border-radius:999px;
+        background:#fffaf0;
+        color:#6f4d3b;
+        padding:9px 15px;
+        cursor:pointer;
+        box-shadow:0 5px 18px rgba(60,40,30,.12);
+      }
+    `;
+    document.head.appendChild(style);
+
+    const layer = document.createElement("div");
+    layer.id = "realAuthLayer";
+    layer.innerHTML = `
+      <div id="realAuthCard" style="position:relative">
+        <button id="realAuthClose" aria-label="Close">×</button>
+
+        <h2 id="realAuthTitle">Welcome to the Shop</h2>
+        <p class="auth-sub" id="realAuthSubtitle">
+          Before you enter, we need to know who you are.
+        </p>
+
+        <div id="realSignupFields">
+          <label>Your name</label>
+          <input id="realAuthName" autocomplete="name" placeholder="What should we call you?">
+        </div>
+
+        <label>Email</label>
+        <input id="realAuthEmail" type="email" autocomplete="email" placeholder="your@email.com">
+
+        <label>Password</label>
+        <input id="realAuthPassword" type="password" autocomplete="current-password" placeholder="Your password">
+
+        <div id="realConfirmWrap">
+          <label>Confirm password</label>
+          <input id="realAuthConfirm" type="password" autocomplete="new-password" placeholder="Type it again">
+        </div>
+
+        <button class="real-auth-main" id="realAuthSubmit">
+          Create my account
+        </button>
+
+        <div class="real-auth-switch">
+          <span id="realAuthSwitchText">Already have an account?</span>
+          <button id="realAuthSwitch">Log in</button>
+        </div>
+
+        <div id="realAuthMessage"></div>
+      </div>
+    `;
+
+    document.body.appendChild(layer);
+
+    const account = document.createElement("button");
+    account.id = "shopAccountButton";
+    account.textContent = "Log in";
+    document.body.appendChild(account);
+
+    setupAuthEvents();
+  }
+
+  let signupMode = true;
+  let afterLogin = null;
+
+  function showAuth(mode = "login", callback = null) {
+    signupMode = mode === "signup";
+    afterLogin = callback;
+
+    const layer = document.getElementById("realAuthLayer");
+    if (!layer) return;
+
+    const title = document.getElementById("realAuthTitle");
+    const subtitle = document.getElementById("realAuthSubtitle");
+    const signupFields = document.getElementById("realSignupFields");
+    const confirmWrap = document.getElementById("realConfirmWrap");
+    const submit = document.getElementById("realAuthSubmit");
+    const switchText = document.getElementById("realAuthSwitchText");
+    const switchButton = document.getElementById("realAuthSwitch");
+    const message = document.getElementById("realAuthMessage");
+
+    message.textContent = "";
+
+    if (signupMode) {
+      title.textContent = "Welcome to the Shop";
+      subtitle.textContent = "Make an account before you enter.";
+      signupFields.style.display = "block";
+      confirmWrap.style.display = "block";
+      submit.textContent = "Create my account";
+      switchText.textContent = "Already have an account?";
+      switchButton.textContent = "Log in";
+    } else {
+      title.textContent = "Welcome back";
+      subtitle.textContent = "The little shop remembers you.";
+      signupFields.style.display = "none";
+      confirmWrap.style.display = "none";
+      submit.textContent = "Log in";
+      switchText.textContent = "Don't have an account?";
+      switchButton.textContent = "Create one";
+    }
+
+    layer.style.display = "flex";
+  }
+
+  function hideAuth() {
+    const layer = document.getElementById("realAuthLayer");
+    if (layer) layer.style.display = "none";
+  }
+
+  function setMessage(text, good = false) {
+    const box = document.getElementById("realAuthMessage");
+    if (!box) return;
+    box.textContent = text;
+    box.style.color = good ? "#54745d" : "#8b554b";
+  }
+
+  function getName(user) {
+    return user?.user_metadata?.display_name ||
+           user?.user_metadata?.name ||
+           user?.email?.split("@")[0] ||
+           "Visitor";
+  }
+
+  function updateAccountButton(user) {
+    const button = document.getElementById("shopAccountButton");
+    if (!button) return;
+
+    if (user) {
+      button.textContent = getName(user) + " · Account";
+    } else {
+      button.textContent = "Log in";
+    }
+  }
+
+  function actuallyEnterShop() {
+    const entrance = document.getElementById("entrance");
+    const store = document.getElementById("littleStore");
+
+    if (!store) return;
+
+    if (entrance) {
+      entrance.classList.add("hidden");
+      entrance.style.opacity = "0";
+      entrance.style.visibility = "hidden";
+      entrance.style.pointerEvents = "none";
+    }
+
+    store.classList.add("enter-fade");
+    document.body.classList.remove("entering");
+
+    window.scrollTo({ top: 0, behavior: "instant" });
+    location.hash = "shop";
+  }
+
+  function setupAuthEvents() {
+    document.getElementById("realAuthClose").onclick = hideAuth;
+
+    document.getElementById("realAuthLayer").onclick = function (e) {
+      if (e.target === this) hideAuth();
+    };
+
+    document.getElementById("realAuthSwitch").onclick = function () {
+      showAuth(signupMode ? "login" : "signup", afterLogin);
+    };
+
+    document.getElementById("shopAccountButton").onclick = async function () {
+      const { data } = await client.auth.getSession();
+
+      if (data.session?.user) {
+        const user = data.session.user;
+
+        const leave = confirm(
+          "You are logged in as " +
+          getName(user) +
+          ".\n\nLog out?"
+        );
+
+        if (leave) {
+          await client.auth.signOut();
+          updateAccountButton(null);
+        }
+      } else {
+        showAuth("login");
+      }
+    };
+
+    document.getElementById("realAuthSubmit").onclick = async function () {
+      const email = document.getElementById("realAuthEmail").value.trim();
+      const password = document.getElementById("realAuthPassword").value;
+
+      if (!email || !password) {
+        setMessage("Please fill in your email and password.");
+        return;
+      }
+
+      this.disabled = true;
+      setMessage("One tiny moment...");
+
+      try {
+        if (signupMode) {
+          const name = document.getElementById("realAuthName").value.trim();
+          const confirm = document.getElementById("realAuthConfirm").value;
+
+          if (!name) {
+            setMessage("Please choose a name for your little shop identity.");
+            this.disabled = false;
+            return;
+          }
+
+          if (password !== confirm) {
+            setMessage("The two passwords don't match.");
+            this.disabled = false;
+            return;
+          }
+
+          const { data, error } = await client.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                display_name: name
+              },
+              emailRedirectTo: window.location.origin + window.location.pathname
+            }
+          });
+
+          if (error) throw error;
+
+          if (!data.session) {
+            setMessage(
+              "Account created! Check your email and confirm your account, then come back to the Shop.",
+              true
+            );
+          } else {
+            setMessage("Welcome, " + name + "~", true);
+            hideAuth();
+            updateAccountButton(data.user);
+
+            if (afterLogin) {
+              const callback = afterLogin;
+              afterLogin = null;
+              callback();
+            }
+          }
+
+        } else {
+          const { data, error } = await client.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (error) throw error;
+
+          setMessage("Welcome back~", true);
+          hideAuth();
+          updateAccountButton(data.user);
+
+          if (afterLogin) {
+            const callback = afterLogin;
+            afterLogin = null;
+            callback();
+          }
+        }
+
+      } catch (error) {
+        setMessage(error.message || "Something went wrong.");
+      }
+
+      this.disabled = false;
+    };
+  }
+
+  async function bootRealAccountSystem() {
+    makeAuthUI();
+
+    const { data } = await client.auth.getSession();
+    updateAccountButton(data.session?.user || null);
+
+    client.auth.onAuthStateChange(function (_event, session) {
+      updateAccountButton(session?.user || null);
+    });
+
+    const store = document.getElementById("littleStore");
+
+    if (store) {
+      const oldClick = store.onclick;
+
+      store.onclick = async function (event) {
+        event.preventDefault();
+
+        const { data } = await client.auth.getSession();
+
+        if (!data.session?.user) {
+          showAuth("login", actuallyEnterShop);
+          return;
+        }
+
+        actuallyEnterShop();
+      };
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootRealAccountSystem);
+  } else {
+    bootRealAccountSystem();
+  }
+
+})();
+</script>
+</body>
 </html>
