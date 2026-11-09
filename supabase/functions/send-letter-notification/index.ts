@@ -24,8 +24,14 @@ async function sendNotification(recipientEmail: string, letterId: string, replyN
         letter_url: letterUrl,
         notification_type: replyName ? "reply" : "letter",
         reply_sender_name: replyName,
-        reply_notice: replyName ? "你写的信收到了回复" : "",
-        message: replyName ? "你写的信收到了回复" : "",
+        reply_notice: replyName
+          ? "你写的信收到了回复。回复人：" + replyName + "。打开小店查看并回复：" + letterUrl
+          : "",
+        message: replyName
+          ? "你写的信收到了回复。\\n回复人：" + replyName + "\\n打开小店查看并回复：" + letterUrl
+          : "",
+        reply_details: replyName ? "回复人：" + replyName : "",
+        website_url: SHOP_URL,
         subject: replyName ? "你写的信收到了回复" : "",
       },
     }),
