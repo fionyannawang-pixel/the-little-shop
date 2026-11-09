@@ -28,7 +28,7 @@ async function sendNotification(recipientEmail: string, letterId: string, replyN
           ? "你写的信收到了回复。回复人：" + replyName + "。打开小店查看并回复：" + letterUrl
           : "",
         message: replyName
-          ? "你写的信收到了回复。\\n回复人：" + replyName + "\\n打开小店查看并回复：" + letterUrl
+          ? "你写的信收到了回复。\n回复人：" + replyName + "\n打开小店查看并回复：" + letterUrl
           : "",
         reply_details: replyName ? "回复人：" + replyName : "",
         website_url: SHOP_URL,
